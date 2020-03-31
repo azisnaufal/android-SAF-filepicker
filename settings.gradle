@@ -1,0 +1,3 @@
+rootProject.name='ExploringStorageAccessFramework'
+include ':app'
+include ':filepicker'
