@@ -51,14 +51,12 @@ class FilePickerActivity : AppCompatActivity(), UriProcessListener {
 
         if (requirePermission(
                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.CAMERA,
-                Manifest.permission.READ_EXTERNAL_STORAGE
+                Manifest.permission.CAMERA
             )
         ) {
             askPermission(
                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.CAMERA,
-                Manifest.permission.READ_EXTERNAL_STORAGE
+                Manifest.permission.CAMERA
             )
         } else {
             start()
@@ -80,7 +78,6 @@ class FilePickerActivity : AppCompatActivity(), UriProcessListener {
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if ((permissions[0] == Manifest.permission.WRITE_EXTERNAL_STORAGE && grantResults[0] == PackageManager.PERMISSION_GRANTED)
                 && (permissions[1] == Manifest.permission.CAMERA && grantResults[1] == PackageManager.PERMISSION_GRANTED)
-                && (permissions[2] == Manifest.permission.READ_EXTERNAL_STORAGE && grantResults[2] == PackageManager.PERMISSION_GRANTED)
             ) {
                 start()
             } else {
