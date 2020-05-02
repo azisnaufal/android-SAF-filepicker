@@ -11,28 +11,32 @@ import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
-import dk.nodes.filepicker.FilePickerConstants.URI
-import dk.nodes.filepicker.utils.Logger
+import androidx.annotation.RequiresApi
+import com.oazisn.filepicker.FilePickerConstants.Companion.URI
+import com.oazisn.filepicker.utils.logd
+import com.oazisn.filepicker.utils.loge
 import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
 
 class FilePickerUriHelper {
-    fun detectPDF(file: File?): Boolean {
+    fun isPDF(file: File): Boolean {
         return try {
-            if (file == null) return false
-            val `is`: InputStream = FileInputStream(file)
+            val inputStream: InputStream = FileInputStream(file)
             val buf = ByteArray(4)
 
-            // 25 50 44 46
-            if (`is`.read(buf, 0, 4) == 4) {
-                if (buf[0] == 0x25 && buf[1] == 0x50 && buf[2] == 0x44 && buf[3] == 0x46
+            // getting file signature
+            if (inputStream.read(buf, 0, 4) == 4) {
+                // compare every byte with 25 50 44 46 (PDF File signature)
+                if (buf[0].compareTo(0x25) == 0 && buf[1].compareTo(0x50) == 0 && buf[2].compareTo(
+                        0x44
+                    ) == 0 && buf[3].compareTo(0x46) == 0
                 ) {
-                    `is`.close()
+                    inputStream.close()
                     return true
                 }
             }
-            `is`.close()
+            inputStream.close()
             false
         } catch (e: Exception) {
             e.printStackTrace()
@@ -42,120 +46,116 @@ class FilePickerUriHelper {
 
     companion object {
         val TAG = FilePickerUriHelper::class.java.simpleName
-        fun getUriString(@NonNull intent: Intent): String? {
+
+        fun getUriString(intent: Intent): String? {
             return if (intent.data != null) {
                 intent.data.toString()
             } else intent.extras!!.getString(URI)
         }
 
-        fun getUri(@NonNull intent: Intent): Uri {
-            return Uri.parse(getUriString(intent))
-        }
+        fun getUri(intent: Intent): Uri = Uri.parse(getUriString(intent))
 
-        fun getFile(
-            @NonNull context: Context,
-            @NonNull intent: Intent
-        ): File? {
-            return getFile(
-                context,
-                getUriString(intent)
-            )
-        }
+        fun getFile(context: Context, intent: Intent): File? =
+            getFile(context, getUriString(intent))
 
-        fun getFile(
-            @NonNull context: Context,
-            @NonNull uri: Uri
-        ): File? {
-            return getFile(context, uri.toString())
-        }
+        fun getFile(context: Context, uri: Uri): File? = getFile(context, uri.toString())
 
         @TargetApi(19)
-        fun getFile(
-            @NonNull context: Context,
-            @NonNull uriString: String?
+        private fun getFile(
+            context: Context,
+            uriString: String?
         ): File? {
-            val filePath =
-                getFilePath(context, uriString) ?: return null
+            val filePath = getFilePath(context, uriString) ?: return null
             return File(filePath)
         }
 
         @TargetApi(19)
         private fun getFilePath(
-            @NonNull context: Context,
-            @NonNull uriString: String?
+            context: Context,
+            uriString: String?
         ): String? {
-            val fileCheck = File(uriString)
-            if (fileCheck.exists()) {
-                return uriString
-            }
-            var filePath: String? = null
-            val uri = Uri.parse(uriString) ?: return null
-            if (File(uri.path).exists()) {
-                return uri.path
-            }
-            var cursor: Cursor? = null
-            // Used the new photos app which uses a different API
-            if (uriString!!.contains("providers.media.documents/")) {
-                // Will return "image:x*"
-                val wholeID = DocumentsContract.getDocumentId(uri)
-                // Split at colon, use second item in the array
-                val id = wholeID.split(":").toTypedArray()[1]
-                var column: Array<String>? = null
-                if (wholeID.contains("image")) {
-                    val iColumn =
-                        arrayOf(MediaStore.Images.Media.DATA)
-                    // where id is equal to
-                    val sel = MediaStore.Images.Media._ID + "=?"
-                    cursor = context.contentResolver.query(
-                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                        iColumn,
-                        sel,
-                        arrayOf(id),
-                        null
-                    )
-                    column = iColumn
-                } else if (wholeID.contains("video")) {
-                    val vColumn =
-                        arrayOf(MediaStore.Video.Media.DATA)
-                    // where id is equal to
-                    val videoSel = MediaStore.Video.Media._ID + "=?"
-                    cursor = context.contentResolver.query(
-                        MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                        vColumn,
-                        videoSel,
-                        arrayOf(id),
-                        null
-                    )
-                    column = vColumn
+            if (!uriString.isNullOrEmpty()) {
+//                1st attempt
+                val fileCheck = File(uriString)
+                if (fileCheck.exists()) {
+                    return uriString
                 }
-                if (cursor == null) { // nor video
-                    return null
+
+//                2nd attemp
+                val uri = Uri.parse(uriString) ?: return null
+                val uriPath = uri.path
+                if (!uriPath.isNullOrEmpty() && File(uriPath).exists()) {
+                    return uri.path
                 }
-                val columnIndex = cursor.getColumnIndex(column!![0])
-                if (cursor.moveToFirst()) {
+
+//                3rd attempt
+                var filePath: String? = null
+                var cursor: Cursor? = null
+                // Used the new photos app which uses a different API
+                if (uriString.contains("providers.media.documents/")) {
+                    // Will return "image:x*"
+                    val wholeID = DocumentsContract.getDocumentId(uri)
+                    // Split at colon, use second item in the array
+                    val id = wholeID.split(":").toTypedArray()[1]
+                    var column: Array<String>? = null
+                    if (wholeID.contains("image")) {
+                        val iColumn =
+                            arrayOf(MediaStore.Images.Media.DATA)
+                        // where id is equal to
+                        val sel = MediaStore.Images.Media._ID + "=?"
+                        cursor = context.contentResolver.query(
+                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                            iColumn,
+                            sel,
+                            arrayOf(id),
+                            null
+                        )
+                        column = iColumn
+                    } else if (wholeID.contains("video")) {
+                        val vColumn =
+                            arrayOf(MediaStore.Video.Media.DATA)
+                        // where id is equal to
+                        val videoSel = MediaStore.Video.Media._ID + "=?"
+                        cursor = context.contentResolver.query(
+                            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                            vColumn,
+                            videoSel,
+                            arrayOf(id),
+                            null
+                        )
+                        column = vColumn
+                    }
+                    if (cursor == null) { // nor video
+                        return null
+                    }
+                    val columnIndex = cursor.getColumnIndex(column!![0])
+                    if (cursor.moveToFirst()) {
+                        filePath = cursor.getString(columnIndex)
+                    }
+                    cursor.close()
+                } else {
+                    val filePathColumn = arrayOf(
+                        MediaStore.Images.Media.DATA,
+                        MediaStore.MediaColumns.DATA
+                    )
+                    cursor = context.contentResolver.query(uri, filePathColumn, null, null, null)
+                    if (cursor == null) {
+                        return null
+                    }
+                    cursor.moveToFirst()
+                    val columnIndex = cursor.getColumnIndex(filePathColumn[0])
                     filePath = cursor.getString(columnIndex)
+                    cursor.close()
                 }
-                cursor.close()
+                return filePath
             } else {
-                val filePathColumn = arrayOf(
-                    MediaStore.Images.Media.DATA,
-                    MediaStore.MediaColumns.DATA
-                )
-                cursor = context.contentResolver.query(uri, filePathColumn, null, null, null)
-                if (cursor == null) {
-                    return null
-                }
-                cursor.moveToFirst()
-                val columnIndex = cursor.getColumnIndex(filePathColumn[0])
-                filePath = cursor.getString(columnIndex)
-                cursor.close()
+                return null
             }
-            return filePath
         }
 
         fun makeImageUri(): Uri {
             val dateFormat =
-                SimpleDateFormat("yyyyMMdd-HHmmss")
+                SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
             val fileName = dateFormat.format(Date()) + ".jpg"
             val photo =
                 File(Environment.getExternalStorageDirectory(), fileName)
@@ -166,27 +166,21 @@ class FilePickerUriHelper {
             return try {
                 var mimeType = context!!.contentResolver.getType(uri!!)
                 val extension: String?
-                Logger.logd(TAG, "uri: $uri")
+                logd("uri: $uri")
                 if (uri.scheme == null) {
-                    Logger.logd(TAG, "Uri.scheme == null")
+                    logd("Uri.scheme == null")
                 }
                 if (uri.scheme == ContentResolver.SCHEME_CONTENT) {
-                    Logger.loge(
-                        TAG,
-                        "mime.getExtensionFromMimeType: $mimeType"
-                    )
+                    loge("mime.getExtensionFromMimeType: $mimeType")
                     // WORKAROUND: we got a device with a buggy cam app that sets the incorrect mimetype, correct it
                     if ("image/jpg".contentEquals(mimeType!!)) {
                         mimeType = "image/jpeg"
                     }
                     val mime = MimeTypeMap.getSingleton()
                     extension = mime.getExtensionFromMimeType(mimeType)
-                    Logger.logd(TAG, "extension: $extension")
+                    logd("extension: $extension")
                 } else {
-                    Logger.logd(
-                        TAG,
-                        "MimeTypeMap.getFileExtensionFromUrl"
-                    )
+                    logd("MimeTypeMap.getFileExtensionFromUrl")
                     extension = MimeTypeMap.getFileExtensionFromUrl(
                         Uri.fromFile(
                             File(uri.path)
@@ -200,6 +194,7 @@ class FilePickerUriHelper {
             }
         }
 
+        @RequiresApi(Build.VERSION_CODES.N)
         fun isVirtualFile(
             context: Context?,
             uri: Uri?
@@ -230,15 +225,12 @@ class FilePickerUriHelper {
             mimeTypeFilter: String?
         ): InputStream {
             val resolver = context!!.contentResolver
-            val openableMimeTypes =
-                resolver.getStreamTypes(uri!!, mimeTypeFilter!!)
-            if (openableMimeTypes == null ||
-                openableMimeTypes.size < 1
-            ) {
+            val openableMimeTypes = resolver.getStreamTypes(uri!!, mimeTypeFilter!!)
+            if (openableMimeTypes == null || openableMimeTypes.isEmpty()) {
                 throw FileNotFoundException()
             }
             return resolver
-                .openTypedAssetFileDescriptor(uri, openableMimeTypes[0], null)
+                .openTypedAssetFileDescriptor(uri, openableMimeTypes[0], null)!!
                 .createInputStream()
         }
     }

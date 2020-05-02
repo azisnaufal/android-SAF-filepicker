@@ -6,8 +6,8 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
-import dk.nodes.filepicker.FilePickerConstants.URI
-import dk.nodes.filepicker.utils.Logger
+import com.oazisn.filepicker.FilePickerConstants.Companion.URI
+import com.oazisn.filepicker.utils.loge
 
 /**
  * Created by bison on 31/10/17.
@@ -22,8 +22,7 @@ class GoogleDocumentsProcessor : IUriProcessor {
         this.uriProcessListener = uriProcessListener
         if (!isValidUri(uri)) {
             if (uriProcessListener != null) {
-                Logger.loge(
-                    TAG,
+                loge(
                     "URI not recognized, bailing out"
                 )
                 uriProcessListener.onProcessingFailure()
@@ -68,7 +67,7 @@ class GoogleDocumentsProcessor : IUriProcessor {
             )
         }
         if (cursor == null) {
-            Logger.loge(TAG, "cursor is null")
+            loge("cursor is null")
             uriProcessListener?.onProcessingFailure()
             return
         }

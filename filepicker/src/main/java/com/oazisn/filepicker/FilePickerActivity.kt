@@ -195,7 +195,9 @@ class FilePickerActivity : AppCompatActivity(), UriProcessListener {
         }
 
         if (intent.resolveActivity(packageManager) != null) {
-            Handler().postDelayed({ startActivityForResult(intentActivity, REQUEST_CODE) }, 500)
+            Handler().postDelayed({
+                startActivityForResult(intentActivity, REQUEST_CODE)
+            }, 500)
         } else {
             setResult(RESULT_FIRST_USER)
             finish()
